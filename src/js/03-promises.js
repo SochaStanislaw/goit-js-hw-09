@@ -1,81 +1,51 @@
-import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.min.css';
-
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
-import convertMs from './convertMsToTime.js';
+const formRef = document.querySelector('.form');
 
-const refs = {
-  inputCalendar: document.getElementById('datetime-picker'),
-  startBtn: document.querySelector('button[data-start]'),
-  resetBtn: document.querySelector('button[data-reset]'),
-  dataDays: document.querySelector('span[data-days]'),
-  dataHours: document.querySelector('span[data-hours]'),
-  dataMinutes: document.querySelector('span[data-minutes]'),
-  dataSeconds: document.querySelector('span[data-seconds]'),
-};
+let amount = null;
+let step = null;
+let firstDelay = null;
 
-let selectedDate = null;
-let intervalId = null;
+formRef.addEventListener('submit', submitForm);
 
-refs.startBtn.addEventListener('click', startTimer);
-refs.resetBtn.addEventListener('click', resetTimer);
-
-function startTimer() {
-  refs.inputCalendar.disabled = true;
-  refs.startBtn.disabled = true;
-  intervalId = setInterval(() => {
-    const currentDate = Date.now();
-    drawingTimer(calculateTime(currentDate));
-  }, 1000);
-}
-
-function resetTimer() {
-  refs.inputCalendar.disabled = false;
-  const now = new Date();
-  flatpickrInstance.setDate(now);
-  clearInterval(intervalId);
-  drawingTimer({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  Notify.info('Date and time updated,timer reset');
-}
-
-function drawingTimer({ days, hours, minutes, seconds }) {
-  refs.dataDays.textContent = addLeadingZero(days);
-  refs.dataHours.textContent = addLeadingZero(hours);
-  refs.dataMinutes.textContent = addLeadingZero(minutes);
-  refs.dataSeconds.textContent = addLeadingZero(seconds);
-}
-
-function addLeadingZero(value) {
-  return String(value).padStart(2, '0');
-}
-
-function checkDate() {
-  const currentDate = Date.now();
-  if (currentDate > selectedDate) {
-    Notify.warning('Please choose a date in the future');
+function submitForm(e) {
+  e.preventDefault();
+  getDataForm();
+  if (step < 0 || firstDelay < 0 || amount <= 0) {
+    Notify.failure('First delay,delay step and amount cannot be negative');
   } else {
-    refs.startBtn.disabled = false;
+    createNotify();
+  }
+}
+function createNotify() {
+  for (let i = 1; i <= amount; i += 1) {
+    createPromise(i, firstDelay)
+      .then(({ position, delay }) => {
+        Notify.success(`✅ Fulfilled promise ${position} in ${delay}ms`);
+      })
+      .catch(({ position, delay }) => {
+        Notify.failure(`❌ Rejected promise ${position} in ${delay}ms`);
+      });
+    firstDelay += step;
   }
 }
 
-function calculateTime(currentDate) {
-  if (selectedDate - currentDate <= 0) {
-    refs.inputCalendar.disabled = false;
-    clearInterval(intervalId);
-    Notify.success('\u{231b} \u{231b} \u{231b} \u{231b} \u{231b}');
-    return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  }
-  return convertMs(selectedDate - currentDate);
+function getDataForm() {
+  amount = Number(formRef.amount.value);
+  step = Number(formRef.step.value);
+  firstDelay = Number(formRef.delay.value);
 }
 
-const flatpickrInstance = flatpickr(refs.inputCalendar, {
-  enableTime: true,
-  time_24hr: true,
-  defaultDate: new Date(),
-  minuteIncrement: 1,
-  onClose(selectedDates) {
-    selectedDate = selectedDates[0].getTime();
-    checkDate();
-  },
-});
+function createPromise(position, delay) {
+  const data = { position, delay };
+  const shouldResolve = Math.random() > 0.3;
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (shouldResolve) {
+        resolve(data);
+      } else {
+        reject(data);
+      }
+    }, delay);
+  });
+}
